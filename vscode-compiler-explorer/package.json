@@ -48,13 +48,13 @@
                 },
                 "compiler-explorer.compilerDefault": {
                     "type": "string",
-                    "default": "clang10",
+                    "default": "clang14",
                     "description": "Compiler code to use for unchecked file types",
                     "scope": "window"
                 },
                 "compiler-explorer.compilerCpp": {
                     "type": "string",
-                    "default": "clang10",
+                    "default": "clang14",
                     "description": "Compiler code to use for c/c++ files",
                     "scope": "window"
                 },

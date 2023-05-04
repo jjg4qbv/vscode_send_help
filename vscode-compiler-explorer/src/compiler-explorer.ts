@@ -3,6 +3,8 @@ import * as logger from './logger'
 import { CompilerExplorerResponse, GodboltLabel } from './compiler-explorer-types';
 import { getCompilerExplorerHost, getCompilerOptions, getCompilerCode, getCompilerIncludes } from './config';
 import {BaseCompiler} from '../compiler-explorer/lib/base-compiler';
+import { makeFakeParseFiltersAndOutputOptions } from '../compiler-explorer/test/utils';
+import * as vscode from 'vscode';
 
 export default class CompilerExplorer {
     currentData: CompilerExplorerResponse | null;
@@ -136,7 +138,7 @@ export default class CompilerExplorer {
         //     compiler: compiler
         // }));
         // return promiseTest;
-        let fetchPromise = fetch(`${apiHost}/api/compiler/${compiler}/compile`, {
+        let initialFetchPromise = fetch(`${apiHost}/api/compiler/${compiler}/compile`, {
             method: 'POST',
             compress: true,
             headers: {
@@ -153,8 +155,8 @@ export default class CompilerExplorer {
         })
         .then(res => { 
             return res.json(); 
-        })
-        .then((json: CompilerExplorerResponse) => { 
+        });
+        let processedIFP = initialFetchPromise.then((json: CompilerExplorerResponse) => { 
             console.log(json);
             this.currentData = json;
             this.logOutput(json);
@@ -194,18 +196,32 @@ export default class CompilerExplorer {
                 // }).join("\n");
                 // console.log(x);
                 // return x; 
-                return json.asm.map(a => a.text).join('\n'); 
+                var x = json.asm.map(a => {
+                    // var string = a.text.split("optnone ").join("").split("noundef ").join("").split("mustprogress ").join("");
+                    var string = a.text.split("noundef ").join("");
+                    if(string.includes("attributes")){
+                        string = string.split("optnone ").join("").split("mustprogress ").join("");
+                    }
+                    // var string = string_optnone_removed.join("");
+
+                    return string;
+                }).join("\n");
+                console.log(x);
+                return x; 
+                
+                //return json.asm.map(a => a.text).join('\n'); 
             }
-        }).then(initial_llvmir => {
-            var new_options = this.getCompileAPIOptions("-passes=instcombine");
-            // console.log("\n\n\n\n\n\n\n\n");
-            // console.log(JSON.stringify({
-            //     source: initial_llvmir,
-            //         lang: "llvmir",
-            //         options: new_options,
-            //         allowStoreCodeDebug: true,
-            //         compiler: "opt"
-            // }));
+        });
+        let followupFetchPromise = processedIFP.then(initial_llvmir => {
+            var new_options = this.getCompileAPIOptions("-passes=instcombine,mem2reg,loop-deletion");
+             console.log("\n\n\n\n\n\n\n\n");
+             console.log(JSON.stringify({
+                 source: initial_llvmir,
+                     lang: "llvmir",
+                     options: new_options,
+                     allowStoreCodeDebug: true,
+                     compiler: "opt"
+             }));
             
             //opt and not opt1600
             return fetch(`${apiHost}/api/compiler/opt/compile`, {
@@ -225,16 +241,167 @@ export default class CompilerExplorer {
             })
         }).then(res => {
             return res.json();
-        }).then(json2 => {
+        });
+        let processedFFP = followupFetchPromise.then(json2 => {
             console.log("--------------------------------------------------------------------")
             console.log(json2);
-            return json2.asm.map(a => a.text).join('\n'); ;
-        })
-        .catch(function(error){
-            console.log("we messed up", error);
+            return json2.asm.map(a => a.text).join('\n');
         })
 
-        return fetchPromise;
+        return Promise.all([initialFetchPromise, followupFetchPromise, processedFFP]).then(([initialJSON, optimizedJSON, processed]) => {
+            //console.log("initial IR: ", initialJSON);
+            let initial_scopes = initialJSON.asm.map(b => b.scope).filter(b => b !== undefined);
+
+            
+            // filter out duplicates
+            let initial_scopes_filtered = initial_scopes.filter((item, index) => initial_scopes.indexOf(item) === index);
+            //console.log(initial_scopes_filtered);
+
+            let line_numbers = initialJSON.asm.filter(s => {
+                if (!s.text) {
+                    return false;
+                }
+                let r = /^\!\d+ = .*line: \d.*$/gm
+                return r.test(s.text);
+            });
+
+            //console.log(line_numbers);
+            //console.log("h2");
+            
+            //initialize dictionary between exclams and line numbers
+            let exclam_line_dict = {};
+
+            let line_numbers_2 = line_numbers.map(s => {
+                let s2 = s.text;
+
+                let r = /line: \d/gm
+                let r2 = r.exec(s2)[0];
+                
+                const line = "line: ";
+                const start = " = ";
+
+                let exclam = s2.indexOf(start);
+                // get part of string up to exclam
+                let r3 = s2.substring(0, exclam);
+                // get the number after line
+                let line_num = parseInt(r2.substring(r2.indexOf(line)+line.length,r2.length));
+
+                exclam_line_dict[r3] = line_num;
+            });
+
+            // make an updated dictionary keeping only the keys in the filtered scopes
+            let exclam_line_dict_filtered = {};
+            for (var key in exclam_line_dict) {
+                if (initial_scopes_filtered.includes(key)) {
+                    exclam_line_dict_filtered[key] = exclam_line_dict[key];
+                }
+            }
+
+
+            //console.log(exclam_line_dict_filtered);
+
+            // repeat the entire filtering process for the optimized IR
+            let optimized_scopes = optimizedJSON.asm.map(b => b.scope).filter(b => b !== undefined);
+            let optimized_scopes_filtered = optimized_scopes.filter((item, index) => optimized_scopes.indexOf(item) === index);
+            // console.log(optimized_scopes_filtered);
+
+            let line_numbers_opt = optimizedJSON.asm.filter(s => {
+                if (!s.text) {
+                    return false;
+                }
+                let r = /^\!\d+ = .*line: \d.*$/gm
+                return r.test(s.text);
+            });
+
+            //console.log(line_numbers_opt);
+            //console.log("h2");
+
+            let exclam_line_dict_opt = {};
+
+            let line_numbers_opt_2 = line_numbers_opt.map(s => {
+                let s2 = s.text;
+
+                let r = /line: \d/gm
+                let r2 = r.exec(s2)[0];
+
+                const line = "line: ";
+                const start = " = ";
+                
+                let exclam = s2.indexOf(start);
+                // get part of string up to exclam
+                let r3 = s2.substring(0, exclam);
+                // get the number after line
+                let line_num = parseInt(r2.substring(r2.indexOf(line)+line.length,r2.length));
+
+                exclam_line_dict_opt[r3] = line_num;
+            });
+
+            let exclam_line_dict_opt_filtered = {};
+            for (var key in exclam_line_dict_opt) {
+                if (optimized_scopes_filtered.includes(key)) {
+                    exclam_line_dict_opt_filtered[key] = exclam_line_dict_opt[key];
+                }
+            }
+
+            //console.log(exclam_line_dict_opt_filtered);
+
+            // get the values from the dictionaries
+
+            let initial_line_numbers = Object.values(exclam_line_dict_filtered);
+            let optimized_line_numbers = Object.values(exclam_line_dict_opt_filtered);
+            // remove duplicates
+            initial_line_numbers = initial_line_numbers.filter((item, index) => initial_line_numbers.indexOf(item) === index);
+            optimized_line_numbers = optimized_line_numbers.filter((item, index) => optimized_line_numbers.indexOf(item) === index);
+
+            // find the values that are in the initial but not the optimized
+            let initial_not_optimized = initial_line_numbers.filter(x => !optimized_line_numbers.includes(x));
+
+            // find the values that are in both
+            let initial_and_optimized = initial_line_numbers.filter(x => optimized_line_numbers.includes(x));
+
+            console.log(initial_line_numbers);
+            console.log(optimized_line_numbers);
+            console.log("Retained lines: " + initial_and_optimized);
+            console.log("Removed lines: " + initial_not_optimized);
+            let activeEditor = vscode.window.activeTextEditor;
+            if (activeEditor) {
+                let decorations: vscode.DecorationOptions[] = [];
+                // let emptyDecorationOptions: vscode.DecorationOptions[] = [];
+                // let range = activeEditor.visibleRanges[0]; // Use the range of the visible area for the editor
+                // activeEditor.setDecorations(vscode.window.createTextEditorDecorationType({}), emptyDecorationOptions);
+
+                // loop through all line numbers in initial_not_optimized
+                let lineCount = activeEditor.document.lineCount;
+                let lineIndex = 0;
+                let emptyDecorations: vscode.DecorationOptions[] = [];
+
+                let emptyDecoration = vscode.window.createTextEditorDecorationType({});
+                let squiggleDecoration = vscode.window.createTextEditorDecorationType({ textDecoration: 'underline wavy' });
+                for (let line = 0; line < lineCount; line++){
+                    let startPos = new vscode.Position(line, 0);
+                    let endPos = new vscode.Position(line, activeEditor.document.lineAt(line).text.length);
+                    
+                    if(line == (initial_not_optimized[lineIndex] as number)-1){
+                        let decoration = { range: new vscode.Range(startPos, endPos), hoverMessage: 'bad' };
+                        // console.log((lineNumber as number));
+                        decorations.push(decoration);
+                        lineIndex += 1;
+                    }
+                    else{
+                        let emptyOption: vscode.DecorationRenderOptions = {};
+                        let decoration = { range: new vscode.Range(startPos, endPos),  emptyOption};
+                        // console.log((lineNumber as number));
+                        emptyDecorations.push(decoration);
+                    }
+                    
+                }
+                console.log(decorations);
+                activeEditor.setDecorations(emptyDecoration, emptyDecorations);
+                activeEditor.setDecorations(squiggleDecoration, decorations);
+            }
+
+            return processed;
+        });
     }
 };
 
