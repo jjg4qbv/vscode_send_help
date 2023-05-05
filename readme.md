@@ -21,7 +21,6 @@ We cloned both repositories and changed several files to make our extension run 
 ```
 git clone https://github.com/jjg4qbv/vscode_send_help.git
 cd vscode_send_help
-chmod +x setup.bash
 ./setup.bash
 ```
 Our project uses a setup script that clones Compiler Explorer, creates all of its requires modules, and then copies over several files that we changed. This is to circumvent a problem with installing Husky, a npm package that requires a git log.
