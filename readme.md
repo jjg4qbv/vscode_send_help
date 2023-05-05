@@ -20,6 +20,7 @@ We cloned both repositories and changed several files to make our extension run 
 
 ```
 git clone https://github.com/jjg4qbv/vscode_send_help.git
+cd vscode_send_help
 chmod +x setup.bash
 ./setup.bash
 ```
