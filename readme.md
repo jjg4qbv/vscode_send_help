@@ -48,7 +48,7 @@ The procedure of Send Help is as follows:
 1. In Compiler Explorer, start a localhost instance. We use the default settings along with port number, and we also changed ```llvm-ir.ts``` in Compiler Explorer to add debug information to LLVM IR returns.
 2. We make an initial API call to the localhost instance using ```clang14``` (or whichever compiler is currently set up). This is called with the source code in the active VSCode editor window along with flags ```-g -S -emit-llvm```. See https://github.com/compiler-explorer/compiler-explorer/blob/main/docs/API.md for more information.
 3. With the base LLVM, we filter out the IR for several keywords (notably ```optnone```, as otherwise future optimizations won't do anything). 
-4. Using the cleaned IR, we use another API call to the localhost instance using ```opt``` as the compiler. The flags passed in are dependent on the ***TODO***.
+4. Using the cleaned IR, we use another API call to the localhost instance using ```opt``` as the compiler. See [Pass Selection](#pass-selection) for more information.
 5. We then determine the the changes in line scope between the initial unoptimized LLVM IR and the final optimized IR. We add underlining using VSCode Decorations for lines that were removed in the optimized instance. 
 
 ### Settings
