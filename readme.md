@@ -78,6 +78,7 @@ Our project was developed with clang14 in mind; this can be changed by modifying
 
 Our project was designed to accept a custom set of LLVM passes from the user. The extension-wide defaults for these passes are also listed in ```package.json```, these were chosen to get a fair mix of common function and loop passes. The user can freely modify the extension defaults via direct change to ```package.json```, or for a more realistic use of the extension, from the emulator run <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd>, Open Settings (UI) then search for "passes." This opens the user's personal extension settings which are designed to optionally override the extension defaults. The passes are structured in groups that are all designed to run at once: for example the default set of passes runs a set of 5 function passes followed by a set of 5 loop passes.
 
+```
 "compiler-explorer.passes": [
     [
         "mem2reg",
@@ -94,6 +95,7 @@ Our project was designed to accept a custom set of LLVM passes from the user. Th
         "jump-threading"
     ]
 ]
+```
 
 ## Current Restrictions and Bugs
 
