@@ -9,3 +9,6 @@ cd ..
 mv ./compiler-explorer-changed-files/c++.local.properties ./compiler-explorer/etc/config/c++.local.properties
 mv ./compiler-explorer-changed-files/llvm-ir.ts ./compiler-explorer/lib/llvm-ir.ts
 npm install
+
+#VSCode debugging
+npm install -D webpack-cli
