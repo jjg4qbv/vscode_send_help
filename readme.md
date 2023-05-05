@@ -101,10 +101,11 @@ Our project was designed to accept a custom set of LLVM passes from the user. Th
 
 Send Help currently uses a locally hosted API call to Compiler Explorer for every compiler run we want. We did this becuase we wanted to change several files in the Compiler Explorer source code and to also shorten development time, but this process is costly in computer resources.
 
-***TODO***
+This project is also unable to compile outside libraries; this is functionality that matches the Compiler Explorer instance in production.
 
 ## Future Work
 
 This work could be expanded in the future; several ideas:
 - adding arguments to the ```opt``` call
 - interfacing with Compiler Explorer's code rather than using their REST API
+- prettifying the UI and fixing issues with underlining scopes. Currently dead loops are underlined at their last bracket, which may be hard to see.
