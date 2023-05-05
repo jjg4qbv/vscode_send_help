@@ -37,7 +37,7 @@ make dev
 
 In a separate terminal, open the root directory of this project:
 1. Run ```code .``` to open VSCode in the current directory.
-2. Open the VSCode debugger (the default keybind is ```F5```) and select "Debug Anyway" if the prompt shows up.
+2. Open the VSCode debugger (the default keybind is ```F5```) and select "Debug Anyway" if the prompt shows up. Wait until Extension Development Host initialization is finished.
 3. In the newly opened Extension Development Host, search for a command to run with ```Ctrl + Shift + P``` and select "compiler-explorer.open"
 
 ## How it Works
