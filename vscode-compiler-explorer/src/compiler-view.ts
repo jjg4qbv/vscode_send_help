@@ -7,6 +7,14 @@ import {getSyntaxHighlightDecorations, DecorationSpecification, getSyntaxHighlig
 import { getCompilerExplorerHost } from './config';
 import fetch from 'node-fetch';
 
+let squiggleDecoration = vscode.window.createTextEditorDecorationType({ textDecoration: 'underline wavy' });
+export {squiggleDecoration};
+let isDecorated = false;
+function setDecorated() {
+    isDecorated = true;
+}
+export {setDecorated};
+
 const highlightDecorationType: vscode.TextEditorDecorationType = vscode.window.createTextEditorDecorationType({
     borderWidth: '1px',
     borderStyle: 'solid',
@@ -29,6 +37,7 @@ export default class CompilerView {
 
     private supportedCompilers = this.getSupportedCompilers();
     activate(context: vscode.ExtensionContext) {
+        
         vscode.window.onDidChangeActiveTextEditor(editor => {
             if( this.currentSourceEditor && this.currentMnemonicsEditor &&
                 editor.document !== this.currentSourceEditor.document &&
@@ -62,6 +71,26 @@ export default class CompilerView {
 
         vscode.workspace.onDidSaveTextDocument((doc: vscode.TextDocument) => {
             vscode.commands.executeCommand('compiler-explorer.updateDisassembly');
+        });
+
+        vscode.workspace.onDidChangeTextDocument((event: vscode.TextDocumentChangeEvent) => {
+            console.log("isDecorated? ", isDecorated)
+            if( !this.currentSourceEditor ) {
+                return;
+            }
+            // clear all squiggles
+            if (!isDecorated) {
+                return;
+            }
+
+            this.currentSourceEditor.setDecorations(squiggleDecoration, []);
+            isDecorated = false;
+            // clear all labels
+            //this.currentLabels = [];
+            // clear all decorations
+            //this.currentMnemonicsDecorations = [];
+            // clear all highlighted lines
+            //this.clearHighlightedLines();
         });
         
         vscode.workspace.onDidCloseTextDocument((doc: vscode.TextDocument) => {
@@ -97,6 +126,24 @@ export default class CompilerView {
         if( !this.canShowCompilerExplorer() ) {
             return;
         }
+
+//         let activeEditor = vscode.window.activeTextEditor;
+//   if (activeEditor) {
+//     // Highlight specific lines with squiggly underlines
+//     let decorations: vscode.DecorationOptions[] = [];
+//     let lineNumbers = [2, 4];
+//     for (let lineNumber of lineNumbers) {
+//       let startPos = new vscode.Position(lineNumber - 1, 0);
+//       let endPos = new vscode.Position(lineNumber - 1, activeEditor.document.lineAt(lineNumber - 1).text.length);
+//       let decoration = { range: new vscode.Range(startPos, endPos), hoverMessage: 'Squiggly underline' };
+//       decorations.push(decoration);
+//     }
+//     activeEditor.setDecorations(vscode.window.createTextEditorDecorationType({}),[]);
+//     activeEditor.setDecorations(vscode.window.createTextEditorDecorationType({ textDecoration: 'underline wavy' }), decorations);
+//     console.log("ok");
+// } else {
+//     console.log("No active editor");
+//   }
 
         this.clearSyntaxHighlighting();
         this.clearHighlightedLines();

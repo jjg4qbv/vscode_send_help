@@ -28,9 +28,9 @@ import fs from 'fs-extra';
 import * as PromClient from 'prom-client';
 import temp from 'temp';
 import _ from 'underscore';
-import * as fs_star from 'fs';
 
 import type {
+    BufferOkFunc,
     BuildResult,
     BuildStep,
     CompilationCacheKey,
@@ -82,7 +82,6 @@ import {getToolchainPath, removeToolchainArg} from './toolchain-utils.js';
 import type {ITool} from './tooling/base-tool.interface.js';
 import * as utils from './utils.js';
 import {unwrap} from './assert.js';
-import { transform } from 'terser-webpack-plugin/types/minify.js';
 
 const compilationTimeHistogram = new PromClient.Histogram({
     name: 'ce_base_compiler_compilation_duration_seconds',
@@ -283,6 +282,8 @@ export class BaseCompiler implements ICompiler {
             }
         } else if (this.lang.id === 'fortran') {
             env.FC = this.compiler.exe;
+        } else if (this.lang.id === 'cuda') {
+            env.CUDACXX = this.compiler.exe;
         } else {
             env.CC = this.compiler.exe;
         }
@@ -394,23 +395,6 @@ export class BaseCompiler implements ICompiler {
         }
 
         const result = await this.exec(compiler, options, execOptions);
-
-        // var i = 0;
-        // for(i; i < options.length; i++){
-        //     if(options[i] == '-emit-llvm'){
-        //         const new_compiler = "opt";
-        //         const new_options:string[] = [
-        //             "-dce",
-        //             "-sroa"
-        //         ];
-        //         const transformed_output_file = this.transformToCompilationResult(result, inputFilename);
-
-        //         return this.runCompiler(new_compiler, new_options, transformed_output_file, execOptions);
-                
-        //     }
-        // }
-        // console.log(result);
-        // console.log(this.transformToCompilationResult(result, inputFilename));
         return {
             ...this.transformToCompilationResult(result, inputFilename),
             languageId: this.getCompilerResultLanguageId(),
@@ -526,7 +510,7 @@ export class BaseCompiler implements ICompiler {
 
     transformToCompilationResult(input: UnprocessedExecResult, inputFilename): CompilationResult {
         const transformedInput = input.filenameTransform(inputFilename);
-        // console.log(transformedInput);
+
         return {
             inputFilename,
             languageId: input.languageId,
@@ -1468,8 +1452,16 @@ export class BaseCompiler implements ICompiler {
         }
     }
 
-    async addArtifactToResult(result: CompilationResult, filepath: string, customType?: string, customTitle?: string) {
+    async addArtifactToResult(
+        result: CompilationResult,
+        filepath: string,
+        customType?: string,
+        customTitle?: string,
+        checkFunc?: BufferOkFunc,
+    ) {
         const file_buffer = await fs.readFile(filepath);
+
+        if (checkFunc && !checkFunc(file_buffer)) return;
 
         const artifact: Artifact = {
             content: file_buffer.toString('base64'),
@@ -1982,6 +1974,8 @@ export class BaseCompiler implements ICompiler {
             return {...this.cmakeBaseEnv, CXXFLAGS: compilerflags};
         } else if (this.lang.id === 'fortran') {
             return {...this.cmakeBaseEnv, FFLAGS: compilerflags};
+        } else if (this.lang.id === 'cuda') {
+            return {...this.cmakeBaseEnv, CUDAFLAGS: compilerflags};
         } else {
             return {...this.cmakeBaseEnv, CFLAGS: compilerflags};
         }
@@ -2057,6 +2051,18 @@ export class BaseCompiler implements ICompiler {
         }
 
         return '';
+    }
+
+    getUsedEnvironmentVariableFlags(makeExecParams) {
+        if (this.lang.id === 'c++') {
+            return utils.splitArguments(makeExecParams.env.CXXFLAGS);
+        } else if (this.lang.id === 'fortran') {
+            return utils.splitArguments(makeExecParams.env.FFLAGS);
+        } else if (this.lang.id === 'cuda') {
+            return utils.splitArguments(makeExecParams.env.CUDAFLAGS);
+        } else {
+            return utils.splitArguments(makeExecParams.env.CFLAGS);
+        }
     }
 
     async cmake(files, key) {
@@ -2152,6 +2158,7 @@ export class BaseCompiler implements ICompiler {
                     code: cmakeStepResult.code,
                     asm: [{text: '<Build failed>'}],
                 };
+                fullResult.result.compilationOptions = this.getUsedEnvironmentVariableFlags(makeExecParams);
                 return fullResult;
             }
 
@@ -2187,13 +2194,7 @@ export class BaseCompiler implements ICompiler {
                 fullResult.result = asmResult;
             }
 
-            if (this.lang.id === 'c++') {
-                fullResult.result.compilationOptions = makeExecParams.env.CXXFLAGS.split(' ');
-            } else if (this.lang.id === 'fortran') {
-                fullResult.result.compilationOptions = makeExecParams.env.FFLAGS.split(' ');
-            } else {
-                fullResult.result.compilationOptions = makeExecParams.env.CFLAGS.split(' ');
-            }
+            fullResult.result.compilationOptions = this.getUsedEnvironmentVariableFlags(makeExecParams);
 
             fullResult.code = 0;
             _.each(fullResult.buildsteps, function (step) {
@@ -2225,9 +2226,7 @@ export class BaseCompiler implements ICompiler {
         );
 
         delete fullResult.result.dirPath;
-        
-        // console.log("cmake - full result:");
-        // console.log(fullResult);
+
         return fullResult;
     }
 
@@ -2325,7 +2324,7 @@ export class BaseCompiler implements ICompiler {
             }
         }
 
-        var temp =  this.env.enqueue(async () => {
+        return this.env.enqueue(async () => {
             const start = performance.now();
             const res = await (async () => {
                 source = this.preProcess(source, filters);
@@ -2358,10 +2357,6 @@ export class BaseCompiler implements ICompiler {
                     libraries,
                     tools,
                 );
-                // console.log("result: ");
-                // console.log(result);
-                // console.log("opt output:");
-                // console.log(optOutput);
 
                 return await this.afterCompilation(
                     result,
@@ -2376,15 +2371,8 @@ export class BaseCompiler implements ICompiler {
                 );
             })();
             compilationTimeHistogram.observe((performance.now() - start) / 1000);
-            // console.log("compile - res - result");
-            // console.log(res);
-
-            // fs_star.writeFileSync("output.txt", res)
             return res;
         });
-        // console.log("compile - result");
-        // console.log(temp);
-        return temp;
     }
 
     async afterCompilation(
@@ -2466,8 +2454,6 @@ export class BaseCompiler implements ICompiler {
                 this.doTempfolderCleanup(result.execResult.buildResult);
             }
         }
-        // console.log("after compilation:")
-        // console.log(result);
         return result;
     }
 
@@ -2477,11 +2463,9 @@ export class BaseCompiler implements ICompiler {
 
     processAsm(result, filters, options) {
         if ((options && options.includes('-emit-llvm')) || this.llvmIr.isLlvmIr(result.asm)) {
-            var output = this.llvmIr.process(result.asm, filters);
-            // console.log("processed asm:");
-            // console.log(output);
-            return output;
+            return this.llvmIr.process(result.asm, filters);
         }
+
         return this.asm.process(result.asm, filters);
     }
 

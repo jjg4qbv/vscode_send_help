@@ -46,7 +46,6 @@ interface DebugLoc {
 }
 
 function DisplayOptInfo(optInfo: LLVMOptInfo) {
-    console.log(optInfo);
     return optInfo.Args.reduce((acc, x) => {
         let inc = '';
         for (const [key, value] of Object.entries(x)) {

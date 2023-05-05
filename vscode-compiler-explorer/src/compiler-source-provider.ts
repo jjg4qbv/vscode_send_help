@@ -21,6 +21,7 @@ export default class CompilerExplorerSourceProvider implements vscode.TextDocume
         const sourceCode = vscode.window.activeTextEditor.document.getText();
         const lang = vscode.window.activeTextEditor.document.languageId;
         return this.compilerExplorer.compile(lang, sourceCode);
+        //return "beans";
 
         // const inputFile = vscode.window.activeTextEditor.document.fileName;
         // const lang = vscode.window.activeTextEditor.document.languageId;

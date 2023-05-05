@@ -24,6 +24,7 @@
 
 import _ from 'underscore';
 import $ from 'jquery';
+import {Buffer} from 'buffer';
 import {ga} from '../analytics.js';
 import * as colour from '../colour.js';
 import {Toggles} from '../widgets/toggles.js';
@@ -62,11 +63,12 @@ import * as utils from '../utils.js';
 import * as Sentry from '@sentry/browser';
 import {editor} from 'monaco-editor';
 import IEditorMouseEvent = editor.IEditorMouseEvent;
-import {Tool, ArtifactType} from '../../types/tool.interfaces.js';
+import {Tool, ArtifactType, Artifact} from '../../types/tool.interfaces.js';
 import {assert, unwrap, unwrapString} from '../assert.js';
 import {CompilerOutputOptions} from '../../types/features/filters.interfaces.js';
 import {AssemblyDocumentationInstructionSet} from '../../types/features/assembly-documentation.interfaces.js';
 import {SourceAndFiles} from '../download-service.js';
+import fileSaver = require('file-saver');
 
 const toolIcons = require.context('../../views/resources/logos', false, /\.(png|svg)$/);
 
@@ -333,7 +335,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         this.id = state.id || hub.nextCompilerId();
 
         this.infoByLang = {};
-        this.deferCompiles = hub.deferred;
+        this.deferCompiles = true;
         this.needsCompile = false;
         this.initLangAndCompiler(state);
 
@@ -388,6 +390,10 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
 
         if (this.sourceTreeId) {
             this.compile();
+        }
+
+        if (!this.hub.deferred) {
+            this.undefer();
         }
     }
 
@@ -718,7 +724,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         });
 
         this.container.layoutManager
-            .createDragSource(this.optButton, createOptView())
+            .createDragSource(this.optButton, createOptView as any)
             // @ts-ignore
             ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -732,7 +738,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         const popularArgumentsMenu = this.domRoot.find('div.populararguments div.dropdown-menu');
         if (this.flagsButton) {
             this.container.layoutManager
-                .createDragSource(this.flagsButton, createFlagsView())
+                .createDragSource(this.flagsButton, createFlagsView as any)
                 // @ts-ignore
                 ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -759,7 +765,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         });
 
         this.container.layoutManager
-            .createDragSource(this.astButton, createAstView())
+            .createDragSource(this.astButton, createAstView as any)
             // @ts-ignore
             ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -771,7 +777,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         });
 
         this.container.layoutManager
-            .createDragSource(this.irButton, createIrView())
+            .createDragSource(this.irButton, createIrView as any)
             // @ts-ignore
             ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -783,7 +789,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         });
 
         this.container.layoutManager
-            .createDragSource(this.llvmOptPipelineButton, createLLVMOptPipelineView())
+            .createDragSource(this.llvmOptPipelineButton, createLLVMOptPipelineView as any)
             // @ts-ignore
             ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -795,7 +801,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         });
 
         this.container.layoutManager
-            .createDragSource(this.deviceButton, createDeviceView())
+            .createDragSource(this.deviceButton, createDeviceView as any)
             // @ts-ignore
             ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -807,7 +813,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         });
 
         this.container.layoutManager
-            .createDragSource(this.rustMirButton, createRustMirView())
+            .createDragSource(this.rustMirButton, createRustMirView as any)
             // @ts-ignore
             ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -819,7 +825,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         });
 
         this.container.layoutManager
-            .createDragSource(this.haskellCoreButton, createHaskellCoreView())
+            .createDragSource(this.haskellCoreButton, createHaskellCoreView as any)
             // @ts-ignore
             ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -831,7 +837,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         });
 
         this.container.layoutManager
-            .createDragSource(this.haskellStgButton, createHaskellStgView())
+            .createDragSource(this.haskellStgButton, createHaskellStgView as any)
             // @ts-ignore
             ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -843,7 +849,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         });
 
         this.container.layoutManager
-            .createDragSource(this.haskellCmmButton, createHaskellCmmView())
+            .createDragSource(this.haskellCmmButton, createHaskellCmmView as any)
             // @ts-ignore
             ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -855,7 +861,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         });
 
         this.container.layoutManager
-            .createDragSource(this.rustMacroExpButton, createRustMacroExpView())
+            .createDragSource(this.rustMacroExpButton, createRustMacroExpView as any)
             // @ts-ignore
             ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -867,7 +873,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         });
 
         this.container.layoutManager
-            .createDragSource(this.rustHirButton, createRustHirView())
+            .createDragSource(this.rustHirButton, createRustHirView as any)
             // @ts-ignore
             ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -879,7 +885,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         });
 
         this.container.layoutManager
-            .createDragSource(this.gccDumpButton, createGccDumpView())
+            .createDragSource(this.gccDumpButton, createGccDumpView as any)
             // @ts-ignore
             ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -891,7 +897,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         });
 
         this.container.layoutManager
-            .createDragSource(this.gnatDebugTreeButton, createGnatDebugTreeView())
+            .createDragSource(this.gnatDebugTreeButton, createGnatDebugTreeView as any)
             // @ts-ignore
             ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -903,7 +909,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         });
 
         this.container.layoutManager
-            .createDragSource(this.gnatDebugButton, createGnatDebugView())
+            .createDragSource(this.gnatDebugButton, createGnatDebugView as any)
             // @ts-ignore
             ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -915,7 +921,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         });
 
         this.container.layoutManager
-            .createDragSource(this.cfgButton, createCfgView())
+            .createDragSource(this.cfgButton, createCfgView as any)
             // @ts-ignore
             ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -927,7 +933,7 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
         });
 
         this.container.layoutManager
-            .createDragSource(this.executorButton, createExecutor())
+            .createDragSource(this.executorButton, createExecutor as any)
             // @ts-ignore
             ._dragListener.on('dragStart', togglePannerAdder);
 
@@ -1738,9 +1744,50 @@ export class Compiler extends MonacoPane<monaco.editor.IStandaloneCodeEditor, Co
                     this.emulateSpeccyTape(artifact.content);
                 } else if (artifact.type === ArtifactType.smsrom) {
                     this.emulateMiracleSMS(artifact.content);
+                } else if (artifact.type === ArtifactType.timetrace) {
+                    this.offerViewInPerfetto(artifact);
                 }
             }
         }
+    }
+
+    offerViewInPerfetto(artifact: Artifact): void {
+        this.alertSystem.notify(
+            'Click ' +
+                '<a target="_blank" id="download_link" style="cursor:pointer;" click="javascript:;">here</a>' +
+                ' to view ' +
+                artifact.title +
+                ' in Perfetto',
+            {
+                group: 'emulation',
+                collapseSimilar: true,
+                dismissTime: 10000,
+                onBeforeShow: function (elem) {
+                    elem.find('#download_link').on('click', () => {
+                        const perfetto_url = 'https://ui.perfetto.dev';
+                        const win = window.open(perfetto_url);
+                        if (win) {
+                            const timer = setInterval(() => win.postMessage('PING', perfetto_url), 50);
+
+                            const onMessageHandler = evt => {
+                                if (evt.data !== 'PONG') return;
+                                clearInterval(timer);
+
+                                const data = {
+                                    perfetto: {
+                                        buffer: Buffer.from(artifact.content, 'base64'),
+                                        title: artifact.name,
+                                        filename: artifact.name,
+                                    },
+                                };
+                                win.postMessage(data, perfetto_url);
+                            };
+                            window.addEventListener('message', onMessageHandler);
+                        }
+                    });
+                },
+            },
+        );
     }
 
     emulateMiracleSMS(image: string): void {
