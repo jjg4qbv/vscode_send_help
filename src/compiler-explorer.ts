@@ -1,11 +1,12 @@
 import fetch from 'node-fetch';
 import * as logger from './logger'
 import { CompilerExplorerResponse, GodboltLabel } from './compiler-explorer-types';
-import { getCompilerExplorerHost, getCompilerOptions, getCompilerCode, getCompilerIncludes } from './config';
+import { getCompilerExplorerHost, getCompilerOptions, getCompilerCode, getCompilerIncludes, getCppPasses } from './config';
 import {BaseCompiler} from '../compiler-explorer/lib/base-compiler';
 import { makeFakeParseFiltersAndOutputOptions } from '../compiler-explorer/test/utils';
 import * as vscode from 'vscode';
 import { squiggleDecoration, setDecorated } from './compiler-view';
+import * as fs from 'fs';
 
 export default class CompilerExplorer {
     currentData: CompilerExplorerResponse | null;
@@ -213,6 +214,8 @@ export default class CompilerExplorer {
                 //return json.asm.map(a => a.text).join('\n'); 
             }
         });
+        // read from passes file
+        console.log(getCppPasses())
         let passes = [
             ["loop-deletion",'indvars'], 
             ["instcombine","mem2reg","jump-threading"],
@@ -359,8 +362,8 @@ export default class CompilerExplorer {
             // find the scopes that were retained
             let retained_scopes = initial_scopes_mapped_filtered.filter(scope => optimized_scopes_mapped_filtered.includes(scope));
 
-            console.log("retained scopes: ", retained_scopes);
-            console.log("removed scopes: ", removed_scopes);
+            console.log("retained lines: ", retained_scopes);
+            console.log("removed lines: ", removed_scopes);
 
             let activeEditor = vscode.window.activeTextEditor;
             if (activeEditor) {
@@ -377,11 +380,11 @@ export default class CompilerExplorer {
                 let emptyDecoration = vscode.window.createTextEditorDecorationType({});
 
                 for (let line = 0; line < lineCount; line++){
-                    let startPos = new vscode.Position(line, 0);
+                    let startPos = new vscode.Position(line, activeEditor.document.lineAt(line).firstNonWhitespaceCharacterIndex);
                     let endPos = new vscode.Position(line, activeEditor.document.lineAt(line).text.length);
                     
                     if(line == (removed_scopes[lineIndex] as number)-1){
-                        let decoration = { range: new vscode.Range(startPos, endPos), hoverMessage: 'bad' };
+                        let decoration = { range: new vscode.Range(startPos, endPos), hoverMessage: 'This code may be removed by one or more optimizations.' };
                         // console.log((lineNumber as number));
                         decorations.push(decoration);
                         lineIndex += 1;

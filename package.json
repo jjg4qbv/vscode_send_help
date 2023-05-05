@@ -36,6 +36,21 @@
         "configuration": {
             "title": "Compiler Explorer Configuration",
             "properties": {
+                "compiler-explorer.passes" : {
+                    "type":"array",
+                    "default": [
+                        ["mem2reg","instcombine","reassociate","gvn","simplifycfg"],
+                        ["lcssa","loop-unroll","loop-deletion","indvars","jump-threading"]
+                    ],
+                    "description": "Compiler passes to run on the IR",
+                    "scope": "window",
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
                 "compiler-explorer.url": {
                     "type": [
                         "string"

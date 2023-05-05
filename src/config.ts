@@ -20,6 +20,11 @@ export function getCompilerCode(lang : string) : string {  // this should return
     return config.get<string>('compiler'+getUnifiedLanguageName(lang));
 }
 
+export function getCppPasses() : string[] {
+    const config: vscode.WorkspaceConfiguration = getConfig();
+    return config.get('passes');
+}
+
 export function getUnifiedLanguageName(lang : string) : string {
     let text = 'Default';
     if( lang == 'c' || lang == 'c++' || lang == 'cpp' ) {
