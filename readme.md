@@ -9,7 +9,7 @@ This project is built off of:
 ## Prerequisites
 
 Our project was developed in  Linux distrobution based on Debian (Ubuntu 20.04). The following packages are required (may need administrator priviledges):
-- clang 14: ```apt install clang ```
+- clang 14: ```apt install clang```
 - llvm opt: ```apt install llvm```
 - npm: ```apt install nodejs npm```
 - VSCode: https://code.visualstudio.com/download
